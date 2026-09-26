@@ -1,0 +1,20 @@
+# ArgoCD の Helm values (bootstrap.sh が使用)
+dex: { enabled: false }
+notifications: { enabled: false }
+
+configs:
+  cm:
+    # Application のヘルス判定を有効化 (ArgoCD 1.8 で既定無効化)
+    # これがないと app-of-apps の sync-wave は子 Application の完了を待たず、
+    # DB 準備前にアプリ (マイグレーション Job) が同期され得る
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil and obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+      return hs

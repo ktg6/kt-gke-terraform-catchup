@@ -1,0 +1,18 @@
+# CloudNativePG オペレーター。Cluster CRD で PostgreSQL を宣言的に運用
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cnpg
+  namespace: argocd
+  annotations: { argocd.argoproj.io/sync-wave: "-2" }
+spec:
+  project: default
+  source:
+    repoURL: https://cloudnative-pg.io/charts
+    chart: cloudnative-pg
+    targetRevision: 0.29.*
+  destination: { server: https://kubernetes.default.svc, namespace: cnpg-system }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    # CRD が大きく client-side apply の annotation 上限を超えるため
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]

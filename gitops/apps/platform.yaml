@@ -1,0 +1,15 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+  annotations: { argocd.argoproj.io/sync-wave: "-1" }
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ktg6/kt-gke-terraform-catchup.git
+    targetRevision: main
+    path: gitops/manifests/platform
+  destination: { server: https://kubernetes.default.svc }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

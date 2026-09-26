@@ -1,0 +1,26 @@
+# image.repository / image.tag は GitHub Actions (app.yaml) が自動更新する
+image:
+  repository: us-central1-docker.pkg.dev/PROJECT_ID/app/todo
+  tag: latest
+
+# stable のレプリカ数。2 以上 + PDB でノード更新・drain 中も無停止
+replicas: 2
+
+# カナリア: canary.enabled=true で2系統デプロイ。weight% を canary へ振り分け
+# ヘッダ "x-canary: true" 付きリクエストは常に canary へ
+canary:
+  enabled: false
+  tag: ""
+  weight: 10
+
+# CloudNativePG が生成する Secret (<cluster名>-app) の接続 URI を使う
+database:
+  secretName: todo-db-app
+
+gateway:
+  name: gateway
+  namespace: istio-ingress
+
+resources:
+  requests: { cpu: 10m, memory: 32Mi }
+  limits: { memory: 128Mi }

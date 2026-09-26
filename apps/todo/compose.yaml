@@ -1,0 +1,28 @@
+# ローカル確認用 (GCP 不要・課金なし)
+#   docker compose up --build
+#   curl localhost:8080/tasks
+#   docker compose exec db psql -U todo
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: todo
+      POSTGRES_PASSWORD: todo
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "todo"]
+      interval: 2s
+  migrate:
+    build: .
+    command: ["-migrate"]
+    environment: &env
+      DATABASE_URL: postgres://todo:todo@db:5432/todo
+    depends_on:
+      db: { condition: service_healthy }
+  api:
+    build: .
+    environment:
+      <<: *env
+      APP_VERSION: local
+    ports: ["8080:8080"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }

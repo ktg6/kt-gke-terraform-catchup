@@ -1,0 +1,65 @@
+# PR: fmt / validate のみ (GCP 認証なし → fork からの PR でも安全)
+# 手動実行: plan / apply / destroy。Environment "gcp" の承認後に実行
+name: terraform
+
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/terraform.yaml"]
+  workflow_dispatch:
+    inputs:
+      action:
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
+
+permissions:
+  contents: read
+
+concurrency: terraform # state 競合防止のため直列実行
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - run: terraform fmt -check -recursive terraform
+      - run: |
+          for d in terraform/bootstrap terraform/envs/dev; do
+            terraform -chdir="$d" init -backend=false -input=false
+            terraform -chdir="$d" validate
+          done
+
+  run:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: gcp
+    permissions:
+      contents: read
+      id-token: write # WIF 用 OIDC トークン発行
+    defaults:
+      run: { working-directory: terraform/envs/dev }
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_gke_version: ${{ vars.GKE_VERSION }}
+      TF_VAR_upgrade_exclusion_start: ${{ vars.GKE_UPGRADE_EXCLUSION_START }}
+      TF_VAR_upgrade_exclusion_end: ${{ vars.GKE_UPGRADE_EXCLUSION_END }}
+      ACTION: ${{ inputs.action }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.TF_SA }}
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+      - run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      - run: |
+          case "$ACTION" in
+            plan)    terraform plan -input=false ;;
+            apply)   terraform apply -input=false -auto-approve ;;
+            destroy) terraform destroy -input=false -auto-approve ;;
+          esac

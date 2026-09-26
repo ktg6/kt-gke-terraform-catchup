@@ -1,0 +1,65 @@
+# kagent: Kubernetes 上で動く AI エージェント。LLM は Gemini API 無料枠
+# 任意コンポーネント: GOOGLE_API_KEY 指定時のみ bootstrap.sh が Secret 作成と併せて apply
+# チャートは OCI レジストリ配布 → ArgoCD にリポジトリ登録が必要
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-kagent
+  namespace: argocd
+  labels: { argocd.argoproj.io/secret-type: repository }
+stringData:
+  type: helm
+  name: kagent
+  url: ghcr.io/kagent-dev/kagent/helm
+  enableOCI: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent-crds
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/kagent-dev/kagent/helm
+    chart: kagent-crds
+    targetRevision: 0.10.2
+  destination: { server: https://kubernetes.default.svc, namespace: kagent }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kagent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/kagent-dev/kagent/helm
+    chart: kagent
+    targetRevision: 0.10.2
+    helm:
+      valuesObject:
+        providers:
+          default: gemini
+          gemini:
+            model: gemini-2.5-flash-lite
+            apiKeySecretRef: kagent-gemini # bootstrap.sh が作成する Secret
+            apiKeySecretKey: GOOGLE_API_KEY
+        # 本構成で使うエージェントのみ有効化 (k8s / istio / helm)
+        kgateway-agent: { enabled: false }
+        promql-agent: { enabled: false }
+        observability-agent: { enabled: false }
+        argo-rollouts-agent: { enabled: false }
+        cilium-policy-agent: { enabled: false }
+        cilium-manager-agent: { enabled: false }
+        cilium-debug-agent: { enabled: false }
+        grafana-mcp: { enabled: false }
+  destination: { server: https://kubernetes.default.svc, namespace: kagent }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    # kagent-crds と同時に登録するため、CRD 作成までは失敗 → リトライで吸収
+    syncOptions: [CreateNamespace=true, SkipDryRunOnMissingResource=true]
+    retry: { limit: 10, backoff: { duration: 30s } }

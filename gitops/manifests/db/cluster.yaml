@@ -1,0 +1,24 @@
+# CloudNativePG の PostgreSQL クラスタ。運用演習は docs/db.md
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: todo-db
+spec:
+  instances: 2 # primary 1 + replica 1。フェイルオーバー演習用
+  # 2 インスタンスを必ず別ノードへ (同一ノードだとノード障害で両方停止)
+  # ノード停止中は replica が Pending になる → primary のみで稼働を継続
+  affinity:
+    podAntiAffinityType: required
+  # DB 関連 Pod には sidecar を入れない (mesh 外として扱う)
+  inheritedMetadata:
+    labels:
+      sidecar.istio.io/inject: "false"
+  bootstrap:
+    initdb:
+      database: todo
+      owner: todo # 接続情報は Secret "todo-db-app" に自動生成される
+  storage:
+    size: 1Gi
+  resources:
+    requests: { cpu: 50m, memory: 256Mi }
+    limits: { memory: 512Mi }

@@ -1,0 +1,19 @@
+# app-of-apps のルート。gitops/apps/ 配下 (必須構成) の Application を全て管理する
+# gitops/optional/ (Datadog, kagent) は API キー指定時に bootstrap.sh が個別に apply
+# scripts/bootstrap.sh が kubectl apply する (手動 apply はこの1回のみ)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ktg6/kt-gke-terraform-catchup.git
+    targetRevision: main
+    path: gitops/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }

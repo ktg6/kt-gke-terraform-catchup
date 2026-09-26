@@ -1,0 +1,32 @@
+# Datadog Agent
+# 任意コンポーネント: DD_API_KEY 指定時のみ bootstrap.sh が Secret "datadog-secret" 作成と併せて apply
+# Free プランは 5 ホストまで。ノード数 = ホスト数
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: datadog
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.datadoghq.com
+    chart: datadog
+    targetRevision: 3.*
+    helm:
+      valuesObject:
+        datadog:
+          site: ap1.datadoghq.com # 登録したサイトに合わせる (US1 なら datadoghq.com)
+          apiKeyExistingSecret: datadog-secret
+          clusterName: catchup
+          logs: { enabled: false } # トライアル中に試すなら true
+          apm: { portEnabled: false }
+        agents:
+          containers:
+            agent:
+              resources: { requests: { cpu: 50m, memory: 256Mi } }
+        clusterAgent:
+          resources: { requests: { cpu: 20m, memory: 128Mi } }
+  destination: { server: https://kubernetes.default.svc, namespace: datadog }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true]

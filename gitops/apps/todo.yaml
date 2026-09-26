@@ -1,0 +1,39 @@
+# DB (CNPG Cluster) → アプリの順に同期
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-db
+  namespace: argocd
+  annotations: { argocd.argoproj.io/sync-wave: "0" }
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ktg6/kt-gke-terraform-catchup.git
+    targetRevision: main
+    path: gitops/manifests/db
+  destination: { server: https://kubernetes.default.svc, namespace: todo }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    # CNPG の CRD 導入前でも dry-run で失敗しないように
+    syncOptions: [CreateNamespace=true, SkipDryRunOnMissingResource=true]
+    # namespace に sidecar 自動注入ラベルを付与
+    managedNamespaceMetadata:
+      labels: { istio-injection: enabled }
+    retry: { limit: 10, backoff: { duration: 30s } }
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo
+  namespace: argocd
+  annotations: { argocd.argoproj.io/sync-wave: "1" }
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ktg6/kt-gke-terraform-catchup.git
+    targetRevision: main
+    path: charts/todo
+  destination: { server: https://kubernetes.default.svc, namespace: todo }
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    retry: { limit: 10, backoff: { duration: 30s } }

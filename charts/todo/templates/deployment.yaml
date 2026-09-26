@@ -1,0 +1,50 @@
+{{- /* stable と (有効なら) canary の2系統を同じテンプレートで生成 */}}
+{{- $tracks := list (dict "name" "stable" "tag" .Values.image.tag "replicas" .Values.replicas) }}
+{{- if .Values.canary.enabled }}
+{{- $tracks = append $tracks (dict "name" "canary" "tag" .Values.canary.tag "replicas" 1) }}
+{{- end }}
+{{- range $tracks }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-{{ .name }}
+spec:
+  replicas: {{ .replicas }}
+  selector:
+    matchLabels: { app: todo, track: {{ .name }} }
+  template:
+    metadata:
+      labels: { app: todo, track: {{ .name }}, version: {{ .tag | trunc 7 | quote }} }
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: todo
+          image: "{{ $.Values.image.repository }}:{{ .tag }}"
+          ports: [{ name: http, containerPort: 8080 }]
+          env:
+            - name: APP_VERSION
+              value: "{{ .name }}-{{ .tag | trunc 7 }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: {{ $.Values.database.secretName }}, key: uri }
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+          resources: {{- toYaml $.Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-{{ .name }}
+spec:
+  selector: { app: todo, track: {{ .name }} }
+  ports: [{ name: http, port: 80, targetPort: http }]
+{{- end }}

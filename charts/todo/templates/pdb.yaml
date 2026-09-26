@@ -1,0 +1,10 @@
+# 自発的な退避 (drain / ノード更新) で同時に止める Pod を 1 つまでに制限
+# Spot 回収など非自発的な停止には効かない
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: todo
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels: { app: todo }

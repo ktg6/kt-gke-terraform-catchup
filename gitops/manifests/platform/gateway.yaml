@@ -1,0 +1,23 @@
+# 入口 (Ingress) を Gateway API で定義。Istio が Envoy の Deployment/Service を自動生成
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: istio-ingress
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: gateway
+  namespace: istio-ingress
+  annotations:
+    # 既定は ClusterIP: LB 費用ゼロ・外部公開なし。port-forward でアクセス
+    # 外部 LB を試す時だけ LoadBalancer に変更 (約 $0.025/h、使い終えたら戻す)
+    networking.istio.io/service-type: ClusterIP
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces: { from: All }

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: todo
+description: 学習用 Todo API
+type: application
+version: 0.1.0
