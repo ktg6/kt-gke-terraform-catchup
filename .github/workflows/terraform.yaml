@@ -1,4 +1,4 @@
-# PR: fmt / validate のみ (GCP 認証なし → fork からの PR でも安全)
+# PR: fmt / validate / tflint / Trivy (GCP 認証なし → fork からの PR でも安全)
 # 手動実行: plan / apply / destroy。Environment "gcp" の承認後に実行
 name: terraform
 
@@ -31,6 +31,23 @@ jobs:
             terraform -chdir="$d" init -backend=false -input=false
             terraform -chdir="$d" validate
           done
+      - uses: terraform-linters/setup-tflint@4cb9feea73331a35b422df102992a03a44a3bb33 # v6.2.1
+        with:
+          tflint_version: v0.62.0
+      - run: |
+          tflint --config=terraform/.tflint.hcl --init
+          for d in terraform/bootstrap terraform/envs/dev; do
+            tflint --chdir="$d" --config="$PWD/terraform/.tflint.hcl" --format=compact
+          done
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          version: v0.74.0
 
   run:
     if: github.event_name == 'workflow_dispatch'
