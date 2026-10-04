@@ -44,6 +44,8 @@ resource "google_compute_subnetwork" "gke" {
   }
 }
 
+# 学習用の公開コントロールプレーン。接続元 CIDR が固定できる環境では許可リストを設定する
+#trivy:ignore:AVD-GCP-0061
 resource "google_container_cluster" "main" {
   name     = "catchup"
   location = var.zone # ゾーンクラスタ: 管理手数料が GKE 無料枠で相殺される
@@ -128,6 +130,7 @@ resource "google_container_node_pool" "spot" {
     disk_size_gb    = 30
     service_account = local.node_sa
     oauth_scopes    = ["https://www.googleapis.com/auth/cloud-platform"]
+    metadata        = { disable-legacy-endpoints = "true" }
     workload_metadata_config { mode = "GKE_METADATA" }
     shielded_instance_config { enable_secure_boot = true }
   }

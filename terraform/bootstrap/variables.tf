@@ -35,3 +35,9 @@ variable "github_repo_id" {
   type        = string
   default     = "1388421027"
 }
+
+variable "github_owner_id" {
+  description = "gh api users/OWNER --jq .id (immutable subject の sub に含まれる)"
+  type        = string
+  default     = "16849557"
+}

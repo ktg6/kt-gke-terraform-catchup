@@ -7,7 +7,7 @@ terraform {
     google = { source = "hashicorp/google", version = "~> 8.0" }
   }
   # 初回はローカル state。apply 後に下記を有効化し `terraform init -migrate-state` で GCS へ移行
-  # backend "gcs" { prefix = "bootstrap" } # bucket は -backend-config で指定
+  backend "gcs" { prefix = "bootstrap" } # bucket は -backend-config で指定
 }
 
 provider "google" {
@@ -116,7 +116,8 @@ resource "google_service_account" "terraform" {
 resource "google_service_account_iam_member" "terraform_wif" {
   service_account_id = google_service_account.terraform.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "${local.pool}/subject/repo:${var.github_repo}:environment:gcp"
+  # リポジトリで immutable subject が有効: sub = repo:OWNER@OWNER_ID/NAME@REPO_ID:environment:gcp
+  member = "${local.pool}/subject/repo:${split("/", var.github_repo)[0]}@${var.github_owner_id}/${split("/", var.github_repo)[1]}@${var.github_repo_id}:environment:gcp"
 }
 
 # envs/dev (VPC + GKE) の作成に必要な最小限
