@@ -1,20 +1,5 @@
 # 学習時に apply、終了時に destroy するリソース (VPC + GKE)
 
-terraform {
-  required_version = ">= 1.9"
-  required_providers {
-    google = { source = "hashicorp/google", version = "~> 8.0" }
-  }
-  backend "gcs" {
-    prefix = "dev" # bucket は -backend-config="bucket=..." で指定
-  }
-}
-
-provider "google" {
-  project = var.project_id
-  region  = var.region
-}
-
 locals {
   # bootstrap で作成済みの SA
   node_sa = "gke-node@${var.project_id}.iam.gserviceaccount.com"

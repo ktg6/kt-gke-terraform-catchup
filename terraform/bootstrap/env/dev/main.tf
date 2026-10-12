@@ -1,23 +1,6 @@
 # 永続リソース (クラスタを destroy しても残すもの)。ローカルから手動で1回 apply
 # state 保管用バケット / CI 認証 (WIF) / サービスアカウント / Artifact Registry / 予算アラート
 
-terraform {
-  required_version = ">= 1.9"
-  required_providers {
-    google = { source = "hashicorp/google", version = "~> 8.0" }
-  }
-  # 初回はローカル state。apply 後に下記を有効化し `terraform init -migrate-state` で GCS へ移行
-  backend "gcs" { prefix = "bootstrap" } # bucket は -backend-config で指定
-}
-
-provider "google" {
-  project = var.project_id
-  region  = var.region
-  # 予算 API はユーザー認証時に quota project の指定が必要
-  billing_project       = var.project_id
-  user_project_override = true
-}
-
 data "google_project" "this" {}
 
 locals {
@@ -120,7 +103,7 @@ resource "google_service_account_iam_member" "terraform_wif" {
   member = "${local.pool}/subject/repo:${split("/", var.github_repo)[0]}@${var.github_owner_id}/${split("/", var.github_repo)[1]}@${var.github_repo_id}:environment:gcp"
 }
 
-# envs/dev (VPC + GKE) の作成に必要な最小限
+# env/dev (VPC + GKE) の作成に必要な最小限
 resource "google_project_iam_member" "terraform" {
   for_each = toset(["roles/container.admin", "roles/compute.networkAdmin"])
   project  = var.project_id
