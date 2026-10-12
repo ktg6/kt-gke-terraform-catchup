@@ -20,8 +20,8 @@ GKE ゾーンクラスタ (Spot e2-standard-2 × 2)
 
 | ディレクトリ | 内容 |
 |---|---|
-| `terraform/bootstrap` | 永続リソース: state バケット, WIF, SA, Artifact Registry, 予算アラート (手動 apply 1回) |
-| `terraform/envs/dev` | VPC + GKE (都度 apply / destroy。CI からも実行可) |
+| `terraform/bootstrap/env/dev` | 永続リソース: state バケット, WIF, SA, Artifact Registry, 予算アラート (手動 apply 1回) |
+| `terraform/env/dev` | VPC + GKE (都度 apply / destroy。CI からも実行可) |
 | `apps/todo` | Go 製 Todo API。解説: [docs/go.md](docs/go.md) |
 | `charts/todo` | 自作 Helm chart (Deployment / HTTPRoute / マイグレーション Job / mTLS) |
 | `gitops/apps` | app-of-apps で管理する必須構成 (Istio, CNPG, Gateway, todo) |
@@ -68,7 +68,7 @@ public リポジトリのため、初回に [docs/security.md](docs/security.md)
 ### 1. bootstrap (1回のみ)
 
 ```sh
-cd terraform/bootstrap
+cd terraform/bootstrap/env/dev
 cp terraform.tfvars.example terraform.tfvars   # project_id, billing_account を記入
 terraform init && terraform apply
 terraform output github_variables               # 次の手順で使用
@@ -89,7 +89,7 @@ CI: Actions → terraform → Run workflow (`apply`) → Environment の承認�
 ローカル:
 
 ```sh
-cd terraform/envs/dev
+cd terraform/env/dev
 terraform init -backend-config="bucket=<PROJECT_ID>-tfstate"
 terraform apply -var project_id=<PROJECT_ID>
 ```
@@ -97,7 +97,7 @@ terraform apply -var project_id=<PROJECT_ID>
 ### 4. ArgoCD 導入
 
 ```sh
-$(terraform -chdir=terraform/envs/dev output -raw get_credentials)
+$(terraform -chdir=terraform/env/dev output -raw get_credentials)
 ./scripts/bootstrap.sh                                   # 必須構成のみ
 DD_API_KEY=xxx GOOGLE_API_KEY=xxx ./scripts/bootstrap.sh  # Datadog / kagent も導入 (片方のみも可)
 ```
