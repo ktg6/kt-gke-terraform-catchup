@@ -7,26 +7,26 @@ locals {
   upgrade_exclusion = var.upgrade_exclusion_start != "" && var.upgrade_exclusion_end != ""
 }
 
-resource "google_compute_network" "vpc" {
-  name                    = "catchup"
-  auto_create_subnetworks = false
+module "network" {
+  source = "../../module/network"
+
+  region          = var.region
+  network_name    = "catchup"
+  subnetwork_name = "gke"
+  subnetwork_cidr = "10.0.0.0/20"
+  pods_cidr       = "10.16.0.0/16"
+  services_cidr   = "10.32.0.0/20"
 }
 
-# VPC ネイティブクラスタ用に Pod / Service のセカンダリ範囲を持つサブネット
-resource "google_compute_subnetwork" "gke" {
-  name                     = "gke"
-  network                  = google_compute_network.vpc.id
-  region                   = var.region
-  ip_cidr_range            = "10.0.0.0/20"
-  private_ip_google_access = true
-  secondary_ip_range {
-    range_name    = "pods"
-    ip_cidr_range = "10.16.0.0/16"
-  }
-  secondary_ip_range {
-    range_name    = "services"
-    ip_cidr_range = "10.32.0.0/20"
-  }
+# 既存リソースのアドレスを module 配下へ移す。移行済み環境でも残しておく
+moved {
+  from = google_compute_network.vpc
+  to   = module.network.google_compute_network.vpc
+}
+
+moved {
+  from = google_compute_subnetwork.gke
+  to   = module.network.google_compute_subnetwork.gke
 }
 
 # 学習用の公開コントロールプレーン。接続元 CIDR が固定できる環境では許可リストを設定する
@@ -34,9 +34,9 @@ resource "google_compute_subnetwork" "gke" {
 resource "google_container_cluster" "main" {
   name     = "catchup"
   location = var.zone # ゾーンクラスタ: 管理手数料が GKE 無料枠で相殺される
-  network  = google_compute_network.vpc.id
+  network  = module.network.network_id
 
-  subnetwork          = google_compute_subnetwork.gke.id
+  subnetwork          = module.network.subnetwork_id
   deletion_protection = false # 学習用: destroy 可能に
   # 初期バージョンの下限 (GKE がより新しくする場合あり)。未指定なら既定バージョン
   min_master_version = var.gke_version != "" ? var.gke_version : null
@@ -64,8 +64,8 @@ resource "google_container_cluster" "main" {
     }
   }
   ip_allocation_policy {
-    cluster_secondary_range_name  = "pods"
-    services_secondary_range_name = "services"
+    cluster_secondary_range_name  = module.network.pods_range_name
+    services_secondary_range_name = module.network.services_range_name
   }
   workload_identity_config { workload_pool = "${var.project_id}.svc.id.goog" }
   gateway_api_config { channel = "CHANNEL_STANDARD" } # Gateway API CRD を GKE が管理
